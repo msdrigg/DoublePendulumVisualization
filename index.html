@@ -75,7 +75,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
 <script>
 
-const lengthScale = 18, 
+const lengthScale = 15, 
 	stepSize = 0.0005,
 	repeats = 32;
 
@@ -88,7 +88,7 @@ let currentCoords,
 let origin, dots1, lines1, dots2, lines2;
 
 const constants = [8, 5, 6, 5],
-	pendulumNumber = 100,
+	pendulumNumber = 70,
 	deviation = 0.0005,
 	initialTime = 0;
 let continueLooping = false,
@@ -126,7 +126,7 @@ function stopLoop() {
 
 function inputInitialData(){
 	let origin = svg.append('g')
-		.attr("transform", "translate(" + (width/2) + "," + (height/4) + ")")
+		.attr("transform", "translate(" + (width/2) + "," + (height/2) + ")")
 		.attr("class", "origin");
 
 	let pendulums = origin.selectAll('.pendulums')
