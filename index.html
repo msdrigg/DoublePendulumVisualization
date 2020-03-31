@@ -7,94 +7,37 @@
 		  -moz-user-select: none; /* Firefox */
 		  -ms-user-select: none; /* IE10+/Edge */
 		  user-select: none; /* Standard */
-		}
-		.state {
-		  fill: gray;
-		}
-		.county-fill {
-		  fill: #00A000;
-		}
-		.county-boundary{
-		  fill: none;
-		  stroke: #FFF;
-		  stroke-linejoin: round;
-		  stroke-width: .8px;
-		}
-		.county-boundary.IRL {
-		  fill: none;
-		  stroke: #000;
-		  stroke-linejoin: round;
-		}
-		.case-boundary {
-		  fill: #FFF;
-		  fill-opacity: 0;
-		  stroke: #FFF;
-		  stroke-width: .5px;
-		}
-		.case-boundary:hover {
-		  stroke: #000;
-		}
-		.case {
-		  fill-opacity: .6;
-		  fill: #C00000;
-		}
-		.death {
-		  fill-opacity: 1;
-		  fill: #000;
-		}
-		.sizeLegend circle, .timeLegend rect{
-		  fill: none;
-		  stroke: #ccc;
-		}
-		.button {
-		  cursor:pointer;
-		}
-		.sizeLegend text, .colorLegend text, .play text, .stop text, .timeLegend text {
-		  fill: #777;
-		  font: 10px sans-serif;
-		  text-anchor: middle;
-		}
-		.colorLegend text, .stop text, .play text {
-		  fill: #FFF;
-		}
-		.stop, .play {
-		  fill: #0000A0;
+		  background-color: black;
+		  color: white;
 		}
 		.title {
 		  text-align: center;
 		}
 		h4 {
-		  fill: #000;
+		  text-color: #FFF;
 		  font: bold 19px sans-serif;
 		  text-anchor: middle;
 		}
 		p {
-		  fill: #000;
+		  fill: #FFF;
 		  font: 12px sans-serif;
 		  text-anchor: middle;
 		  padding: 0px;
 		}
 		.footer p {
+		  fill: #FFF
 		  font: 12px sans-serif;
 		  padding-left: 36px;
 		  text-indent: -36px;
 		}
 		h5 {
+		  fill: #FFF
 		  margin-block-end: .8em;
 		  font: bold 14px sans-serif;	
 		  margin-block-start: 3em;
 		}
-		div.tooltip {	
-			position: absolute;			
-			text-align: center;			
-			width: 60px;					
-			height: 38px;					
-			padding: 2px;				
-			font: 10px sans-serif;		
-			background: lightsteelblue;	
-			border: 0px;		
-			border-radius: 8px;			
-			pointer-events: none;			
+		.pendulumLine1, .pendulumLine2 {
+		  "stroke-width", 5;
 		}
 	</style>
 	<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
@@ -113,107 +56,179 @@
 	<script src="https://d3js.org/d3-ease.v1.min.js"></script>
 	<script src="https://d3js.org/d3-interpolate.v1.min.js"></script>
 	<script src="https://d3js.org/d3-selection.v1.min.js"></script>
-	<!-- <script src="https://d3js.org/d3-timer.v1.min.js"></script> -->
-	<!-- <script src="https://d3js.org/d3-transition.v1.min.js"></script> -->
-	<!-- <script src="https://d3js.org/d3-ease.v1.min.js"></script> -->
 </head>
 
 <body>
 <div id="mainID" class="title">
 <h4>
-  Visualizing the Spread of COVID-19 in South Carolina
+  The chaos of double pendulums
 </h4>
-<p>
-  Hover over bubbles to see details
-</p>
 </div>
 <div class="footer">
   <h5>
   Sources
   </h5>
   <p>
-  &quotDHEC News Releases, Information & Videos (COVID-19).&quot <italics>SCDHEC</italics>. https://scdhec.gov/infectious-diseases/viruses/coronavirus-disease-2019-covid-19/dhec-news-releases-videos-2019-ncov. Accessed 27 Mar. 2020.
+  Assencio, Diego. &quotThe double pendulum: Hamiltonian formulation.&quot 17 May 2014. https://diego.assencio.com/?index=e5ac36fcb129ce95a61f8e8ce0572dbf. Accessed 31 Mar. 2020.
   </p>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
 <script>
-const width = 420,
-    height = 360;
 
-const lengthScale = 8;
-const stepSize = 0.0005;
+const lengthScale = 18, 
+	stepSize = 0.0005,
+	repeats = 32;
 
-let timerID = 0;
-let currentCoords;
-let currentTime;
-let started = false;
+
+let timerID = 0,
+	started = false;
+let currentCoords,
+	currentTime;
+
+let origin, dots1, lines1, dots2, lines2;
+
+const constants = [8, 5, 6, 5],
+	pendulumNumber = 100,
+	deviation = 0.0005,
+	initialTime = 0;
+let continueLooping = false,
+	currentCartCoords,
+	restartable = false,
+	colorscaleVariable = 0;
+let goodColorScales = [d3.interpolateOranges, d3.interpolateInferno, d3.interpolatePlasma],
+	colorScale = goodColorScales[1];
+
+const width = 2*lengthScale*(constants[0] + constants[2])*1.05,
+    height = 2*lengthScale*(constants[0] + constants[2])*1.05;
 
 let svg = d3.select(".title").append("svg")
     .attr("width", width)
     .attr("height", height);
 
-const constants = [8, 5, 6, 5];
-const pendulumNumber = 100;
-const initialTime = 0;
-let colorScale = d3.interpolatePuOr;
 currentTime = initialTime;
-const initialCoords = initPendulums(1.5, 3.1, 0.00025, pendulumNumber);
-const initialCoordsCart = convertToCoordinates(initialCoords, constants);
+	const initialCoords = initPendulums(1.5, 3.1, deviation, pendulumNumber);
+	const initialCoordsCart = convertToCoordinates(initialCoords, constants);
 
-let origin = svg.append('g')
-	.attr("transform", "translate(" + (width/2) + "," + (height/2) + ")")
-	.attr("class", "origin");
 
-origin.append("circle")
-	.attr("class", "origin-mark")
-	.attr("r", 10);
-
-let dots1 = origin.selectAll('.dots1')
-	.data(initialCoordsCart).enter()
-	.append('circle')
-	.attr("class", "dots1")
-	.attr("fill", function(d, i) { return colorScale(i/(pendulumNumber - 1));})
-	.attr("cx", function (d) { return d[0]*lengthScale;})
-	.attr("cy", function (d) { return d[1]*lengthScale;})
-	.attr("r", constants[1]);
-	
-let dots2 = origin.selectAll('.dots2')
-	.data(initialCoordsCart).enter()
-	.append('circle').attr("class", "dots2")
-	.data(initialCoordsCart)
-	.attr("fill", function(d, i) { return colorScale(i/(pendulumNumber - 1));})
-	.attr("cx", function (d) { return d[2]*lengthScale;})
-	.attr("cy", function (d) { return d[3]*lengthScale;})
-	.attr("r", constants[3]);
-
-currentCoords = initialCoords.clone();
 
 function startLoop() {
-	timerID = setInterval(updateDisplay, 1);
+	<!-- timerID = setInterval(updateDisplay, 1); -->
+	if (! continueLooping ) {
+		continueLooping = true;
+		requestAnimationFrame(updateDisplay);
+	}
 }
 
 function stopLoop() {
-	clearInterval(timerID)
+	<!-- clearInterval(timerID) -->
+	if (continueLooping) continueLooping = false;
 }
 
+function inputInitialData(){
+	let origin = svg.append('g')
+		.attr("transform", "translate(" + (width/2) + "," + (height/4) + ")")
+		.attr("class", "origin");
+
+	let pendulums = origin.selectAll('.pendulums')
+		.data(initialCoordsCart).enter()
+		.append('g').attr("class", "pendulums");
+
+	lines1 = pendulums
+		.append('line')
+		.attr("class", "pendulumLine1")
+		.attr("x1", 0)
+		.attr("y1", 0)
+		.attr("x2", function (d) { return d[0]*lengthScale;})
+		.attr("y2", function (d) { return d[1]*lengthScale;})
+		.attr("stroke", function(d, i) { return colorScale(i/(pendulumNumber + 5));});
+		
+	lines2 = pendulums
+		.append('line')
+		.attr("class", "pendulumLine2")
+		.attr("x1", function (d) { return d[0]*lengthScale;})
+		.attr("y1", function (d) { return d[1]*lengthScale;})
+		.attr("x2", function (d) { return d[2]*lengthScale;})
+		.attr("y2", function (d) { return d[3]*lengthScale;})
+		.attr("stroke", function(d, i) { return colorScale(i/(pendulumNumber + 5));});
+
+	dots1 = pendulums
+		.append('circle')
+		.attr("class", "dots1")
+		.attr("fill", function(d, i) { return colorScale(i/(pendulumNumber + 5));})
+		.attr("cx", function (d) { return d[0]*lengthScale;})
+		.attr("cy", function (d) { return d[1]*lengthScale;})
+		.attr("r", constants[1]);
+		
+	dots2 = pendulums
+		.append('circle')
+		.attr("class", "dots2")
+		.attr("fill", function(d, i) { return colorScale(i/(pendulumNumber + 5));})
+		.attr("cx", function (d) { return d[2]*lengthScale;})
+		.attr("cy", function (d) { return d[3]*lengthScale;})
+		.attr("r", constants[3]);
+
+	origin.append("circle")
+		.attr("class", "origin-mark")
+		.attr("r", 8)
+		.style("fill", ()=>{return colorScale((pendulumNumber - 1)/(pendulumNumber + 5))});;
+
+	currentCoords = initialCoords.clone();
+}
+
+function drawPendulumsAt(newCoords) {
+	dots1.data(newCoords)
+		.attr("cx", function (d) { return d[0]*lengthScale;})
+		.attr("cy", function (d) { return d[1]*lengthScale;});
+	dots2.data(newCoords)
+		.attr("cx", function (d) { return d[2]*lengthScale;})
+		.attr("cy", function (d) { return d[3]*lengthScale;});
+		
+	lines1.data(newCoords)
+		.attr("x2", function (d) { return d[0]*lengthScale;})
+		.attr("y2", function (d) { return d[1]*lengthScale;});
+	
+	lines2.data(newCoords)
+		.attr("x1", function (d) { return d[0]*lengthScale;})
+		.attr("y1", function (d) { return d[1]*lengthScale;})
+		.attr("x2", function (d) { return d[2]*lengthScale;})
+		.attr("y2", function (d) { return d[3]*lengthScale;});
+}
+
+
 function updateDisplay(){
-	let tempCoords = currentCoords.clone();
-	const repeats = 40;
 	for (let i = 0; i < repeats; i++) {
 		currentCoords = RK4LA(derivativeLA, stepSize, currentTime, currentCoords, constants);
 	}
-	<!-- currentCoords.print(); -->
 	currentTime += stepSize*repeats
-	const newCartCoordinates = convertToCoordinates(currentCoords, constants)
-	dots1.data(newCartCoordinates)
+	currentCartCoords = convertToCoordinates(currentCoords, constants)
+
+	dots1.data(currentCartCoords)
 		.attr("cx", function (d) { return d[0]*lengthScale;})
 		.attr("cy", function (d) { return d[1]*lengthScale;});
-	dots2.data(newCartCoordinates)
+	dots2.data(currentCartCoords)
 		.attr("cx", function (d) { return d[2]*lengthScale;})
 		.attr("cy", function (d) { return d[3]*lengthScale;});
+		
+	lines1.data(currentCartCoords)
+		.attr("x2", function (d) { return d[0]*lengthScale;})
+		.attr("y2", function (d) { return d[1]*lengthScale;});
+	
+	lines2.data(currentCartCoords)
+		.attr("x1", function (d) { return d[0]*lengthScale;})
+		.attr("y1", function (d) { return d[1]*lengthScale;})
+		.attr("x2", function (d) { return d[2]*lengthScale;})
+		.attr("y2", function (d) { return d[3]*lengthScale;});
+	if (continueLooping) requestAnimationFrame(updateDisplay);
 }
 
+inputInitialData();
+
 svg.on("click", () => {
+	if (restartable) {
+		restartable = false;
+		drawPendulumsAt(initialCoordsCart);
+		return;
+	}
 	if (!started){
 		started = true;
 		startLoop();
@@ -223,373 +238,8 @@ svg.on("click", () => {
 		started = false;
 	}});
 
-<!-- let sc_projection = d3.geoAlbers() -->
-  <!-- .parallels([32 + 30 / 60, 34 + 50 / 60]) -->
-  <!-- .rotate([81, 0]) -->
-    <!-- .scale(6000) -->
-    <!-- .translate([155, -340]); -->
-
-<!-- let path = d3.geoPath() -->
-    <!-- .projection(sc_projection); -->
-
-<!-- let tooltip = d3.select(".title").append("div")	 -->
-    <!-- .attr("class", "tooltip")				 -->
-    <!-- .style("opacity", 0); -->
-
-<!-- let radius; -->
-
-<!-- let playButton; -->
-<!-- let stopButton; -->
-
-<!-- let sizeLegend; -->
-<!-- let colorLegend; -->
-<!-- let timeLegend; -->
-
-<!-- let virusData; -->
-<!-- let deathData; -->
-<!-- let centroids = {}; -->
-<!-- let totalData = {}; -->
-
-<!-- let dateOptions = {'month': 'long', 'day': 'numeric'}; -->
-<!-- let dataLoaded = false; -->
-<!-- let currentDay = 0; -->
-<!-- let timerID = -1; -->
-<!-- let isPlaying = false; -->
-
-<!-- function getDate(day){ -->
-  <!-- return new Date(2020, 2, 6 + day); -->
-<!-- } -->
-
-<!-- function drawButtons(){ -->
-  <!-- let buttonGroup = svg.append("g") -->
-	<!-- .attr("transform", "translate(" + (width - 50) + "," + (height - 20 - (2*maxRadius + 10)) + ")") -->
-    <!-- .attr("class", "button"); -->
-  
-  <!-- playButton = buttonGroup.append("g") -->
-    <!-- .attr("class", "play").on("click", playAnimation); -->
-  <!-- playButton.append("rect") -->
-	<!-- .attr("rx", 10) -->
-	<!-- .attr("ry", 10) -->
-    <!-- .attr("width", maxRadius*2) -->
-	<!-- .attr("x",-maxRadius) -->
-	<!-- .attr("height", maxRadius); -->
-  <!-- playButton.append("text") -->
-	<!-- .attr("y",4) -->
-	<!-- .attr("dy", "1.2em") -->
-	<!-- .text("Play"); -->
-  
-  <!-- stopButton = buttonGroup.append("g") -->
-    <!-- .attr("class", "stop").on("click", stopAnimation); -->
-  <!-- stopButton.append("rect") -->
-    <!-- .attr("width", maxRadius*2) -->
-	<!-- .attr("rx", 10) -->
-	<!-- .attr("ry", 10) -->
-	<!-- .attr("height", maxRadius) -->
-	<!-- .attr("x",-maxRadius) -->
-	<!-- .attr("y", maxRadius + 10); -->
-  <!-- stopButton.append("text") -->
-	<!-- .attr("y", maxRadius + 10  + 4) -->
-	<!-- .attr("dy", "1.2em") -->
-	<!-- .text("Stop"); -->
-<!-- } -->
-
-<!-- function drawLegend(){ -->
-	<!-- let d1 = maxData/2; -->
-	<!-- let d2 = maxData/4; -->
-	<!-- sizeLegend = svg.append("g") -->
-		<!-- .attr("class", "sizeLegend") -->
-		<!-- .attr("transform", "translate(" + 60 + "," + (height - 20) + ")") -->
-	  <!-- .selectAll("g") -->
-		<!-- .data([Math.floor(d1 / 10) * 10, Math.floor(d2 / 10) * 10, Math.floor(maxData / 10) * 10]) -->
-	  <!-- .enter().append("g"); -->
-
-	<!-- sizeLegend.append("circle") -->
-		<!-- .attr("cy", function(d) { return -radius(d); }) -->
-		<!-- .attr("r", radius); -->
-
-	<!-- sizeLegend.append("text") -->
-		<!-- .attr("y", function(d) { return -2 * radius(d); }) -->
-		<!-- .attr("dy", "1.2em") -->
-		<!-- .text(d3.format(".1s")); -->
-
-	<!-- colorLegend = svg.append("g") -->
-		<!-- .attr("class", "colorLegend") -->
-		<!-- .attr("transform", "translate(" + 60 + "," + (height - (20 + 2*maxRadius)) + ")") -->
-	  <!-- .selectAll("g") -->
-		<!-- .data([[0, "Cases", "#C00000"], [1, "Deaths", "#000"]]) -->
-	  <!-- .enter().append("g"); -->
-
-	<!-- colorLegend.append("circle") -->
-		<!-- .attr("cx", function(d) { return d[0]*60 - 30; }) -->
-		<!-- .attr("cy", -maxRadius) -->
-		<!-- .attr("r", maxRadius) -->
-		<!-- .style("fill", function(d) {return d[2];}); -->
-
-	<!-- colorLegend.append("text") -->
-		<!-- .attr("x", function(d) { return d[0]*60 - 30; }) -->
-		<!-- .attr("y", -maxRadius - 10) -->
-		<!-- .attr("dy", "1.2em") -->
-		<!-- .text(function (d) { return d[1]; } ); -->
-	<!-- timeLegend = svg.append("g") -->
-		<!-- .attr("class", "timeLegend") -->
-		<!-- .attr("transform", "translate(" + 60 + "," + (height - (20 + 32 + 4*maxRadius)) + ")") -->
-		<!-- .data([0]); -->
-		
-	<!-- timeLegend.append("rect") -->
-		<!-- .attr("width", maxRadius*2 + 4) -->
-		<!-- .attr("rx", 10) -->
-		<!-- .attr("ry", 10) -->
-		<!-- .attr("height", maxRadius) -->
-		<!-- .attr("x",-maxRadius - 2); -->
-	<!-- timeLegend -->
-		<!-- .append("text") -->
-		<!-- .attr("y", maxRadius/2 + 3) -->
-		<!-- .text(function(d) { return getDate(d).toLocaleDateString("en-US", dateOptions);}); -->
-<!-- } -->
-
-<!-- function load_initial_data(){ -->
-  <!-- maxData = 0; -->
-  <!-- for (day in virusData.columns){ -->
-    <!-- let dayData = {}; -->
-	<!-- for (county in virusData[day]){ -->
-	  <!-- dayData[county] = [virusData[day][county], deathData[day][county]]; -->
-	  <!-- maxData = Math.max(maxData, virusData[day][county]); -->
-	<!-- } -->
-	<!-- totalData[day] = dayData; -->
-  <!-- } -->
-  <!-- radius = d3.scaleSqrt() -->
-    <!-- .domain([0, maxData]) -->
-    <!-- .range([0, maxRadius]); -->
-  <!-- drawLegend(); -->
-  <!-- drawButtons(); -->
-  <!-- fill_initial_data(); -->
-<!-- } -->
-
-<!-- function inputInitialData(){ -->
-	<!-- d3.csv("SC_VIRUS_TOTAL_CUMULATIVE.csv") -->
-		<!-- .then(function(total_data){ -->
-			  <!-- virusData = total_data; -->
-			  <!-- if (dataLoaded) { -->
-				<!-- load_initial_data(); -->
-			  <!-- } -->
-			  <!-- else { -->
-				<!-- dataLoaded = true; -->
-			  <!-- } -->
-		<!-- }); -->
-	<!-- d3.csv("SC_VIRUS_DEATH_CUMULATIVE.csv") -->
-		<!-- .then(function(total_data){ -->
-			<!-- deathData = total_data; -->
-			<!-- if (dataLoaded) { -->
-			<!-- load_initial_data(); -->
-			<!-- } -->
-			<!-- else { -->
-			<!-- dataLoaded = true; -->
-			<!-- } -->
-		<!-- }); -->
-<!-- } -->
-
-<!-- function fill_initial_data(){ -->
-  <!-- let dVList = d3.entries(totalData[0]); -->
-  <!-- svg.selectAll("path.county-fill") -->
-      <!-- .data(dVList) -->
-	  <!-- .style("fill-opacity", function (d) {  -->
-	    <!-- if (+(d.value[0]) > 0) return 0; -->
-		<!-- return 1; -->
-	  <!-- }) -->
-	<!-- .on("mouseover", function(d) { -->
-        <!-- if (+(d.value[0]) >= 1) return; -->
-	    <!-- let firstS = ""; -->
-		<!-- let secondS = ""; -->
-		<!-- if (d.value[0] != 1) firstS = "s"; -->
-		<!-- if (d.value[1] != 1) secondS = "s"; -->
-        <!-- let tooltipText = "<bold>" + d.key + "</bold>" + "<br/>"  + (+d.value[0]) + " case" + firstS + "<br/>" + (+d.value[1]) + " death" + secondS; -->
-		<!-- tooltip.transition()		 -->
-			<!-- .duration(200)		 -->
-			<!-- .style("opacity", .9);		 -->
-		<!-- tooltip.html(tooltipText)	 -->
-			<!-- .style("left", (d3.event.pageX) + "px")		 -->
-			<!-- .style("top", (d3.event.pageY - 28) + "px");	 -->
-		<!-- })					 -->
-	<!-- .on("mouseout", function(d) { -->
-		<!-- tooltip.transition()		 -->
-			<!-- .duration(500)		 -->
-			<!-- .style("opacity", 0);}); -->
-  <!-- let countyLocations = svg.append("g") -->
-    <!-- .attr("class", "bubble-container") -->
-    <!-- .selectAll(".county-centroid") -->
-	<!-- .data(dVList) -->
-    <!-- .enter().append("g") -->
-	<!-- .attr("class", "county-centroid") -->
-	<!-- .attr("transform", function(d) { -->
-	<!-- return "translate(" +  -->
-	<!-- centroids[d.key] + ")"; }); -->
-	
-  <!-- countyLocations.append("circle") -->
-	<!-- .attr("class", "case") -->
-	<!-- .attr("r", function(d) { return radius(+(d.value[0])); }); -->
-  
-  <!-- countyLocations.append("circle") -->
-    <!-- .attr("class", "death") -->
-	<!-- .attr("r", function(d) { return radius(+(d.value[1])); }); -->
-  
-  
-  <!-- countyLocations.append("circle") -->
-	<!-- .attr("class", "case-boundary") -->
-	<!-- .attr("r", function(d) { return radius(+(d.value[0])); }) -->
-	<!-- .on("mouseover", function(d) { -->
-	    <!-- let firstS = ""; -->
-		<!-- let secondS = ""; -->
-		<!-- if (d.value[0] != 1) firstS = "s"; -->
-		<!-- if (d.value[1] != 1) secondS = "s"; -->
-        <!-- let tooltipText = "<bold>" + d.key + "</bold>" + "<br/>"  + (+d.value[0]) + " case" + firstS + "<br/>" + (+d.value[1]) + " death" + secondS; -->
-		<!-- tooltip.transition()		 -->
-			<!-- .duration(200)		 -->
-			<!-- .style("opacity", .9);		 -->
-		<!-- tooltip.html(tooltipText)	 -->
-			<!-- .style("left", (d3.event.pageX) + "px")		 -->
-			<!-- .style("top", (d3.event.pageY - 28) + "px");	 -->
-		<!-- })					 -->
-	<!-- .on("mouseout", function(d) {		 -->
-		<!-- tooltip.transition()		 -->
-			<!-- .duration(500)		 -->
-			<!-- .style("opacity", 0);}); -->
-<!-- } -->
-
-<!-- function playAnimation(){ -->
-  <!-- if (isPlaying) return; -->
-  <!-- isPlaying = true; -->
-  <!-- if (currentDay >= Object.keys(virusData).length - 2){ -->
-    <!-- currentDay = 0; -->
-    <!-- transitionToDay(currentDay); -->
-  <!-- } -->
-  <!-- timerID = setInterval( -->
-    <!-- () => updateForNextDay(), 605 -->
-  <!-- ); -->
-<!-- } -->
-
-<!-- function stopAnimation(){ -->
-  <!-- if (!isPlaying) return; -->
-  <!-- if (timerID != -1) { -->
-	<!-- clearInterval(timerID); -->
-  <!-- } -->
-  <!-- isPlaying = false; -->
-<!-- } -->
-
-<!-- function updateForNextDay() {  -->
-  <!-- currentDay = (currentDay + 1)%(Object.keys(totalData).length - 2); -->
-  <!-- transitionToDay(currentDay); -->
-<!-- } -->
-
-<!-- function transitionToDay(day){ -->
-  <!-- if (day >= Object.keys(virusData).length - 2){ -->
-    <!-- stopAnimation(); -->
-  <!-- } -->
-  
-  <!-- let dVList = d3.entries(totalData[day]); -->
-  
-  <!-- let countyLocations = svg.select(".bubble-container") -->
-    <!-- .selectAll(".county-centroid") -->
-	<!-- .data(dVList); -->
-  <!-- let cases = countyLocations.select("circle.case"); -->
-  <!-- let deaths = countyLocations.select("circle.death"); -->
-  <!-- let boundaries = countyLocations.select("circle.case-boundary"); -->
-  
-  
-  <!-- svg.select(".timeLegend") -->
-    <!-- .data([day]) -->
-    <!-- .select("text") -->
-    <!-- .text(function(d) { return getDate(d).toLocaleDateString("en-US", dateOptions);}); -->
-  
-  <!-- if (day == 0) { -->
-	<!-- cases -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[0]))}); -->
-  
-    <!-- deaths -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[1]))}); -->
-  
-	<!-- boundaries -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[0]))}); -->
-	  
-	<!-- svg.selectAll("path.county-fill") -->
-      <!-- .data(dVList) -->
-	  <!-- .style("fill-opacity", function (d, i) {  -->
-	    <!-- if (+(d.value[0]) >= 1) return 0; -->
-		<!-- return 1; -->
-	  <!-- }) -->
-  <!-- } -->
-  <!-- else { -->
-	<!-- let transitionEase = d3.easeLinear -->
-	<!-- let duration = 600; -->
-	<!-- cases.transition() -->
-	  <!-- .duration(duration) -->
-	  <!-- .ease(transitionEase) -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[0]))}); -->
-  
-    <!-- deaths.transition() -->
-	  <!-- .duration(duration) -->
-	  <!-- .ease(transitionEase) -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[1]))}); -->
-  
-	<!-- boundaries.transition() -->
-      <!-- .duration(duration) -->
-	  <!-- .ease(transitionEase) -->
-	  <!-- .attr("r", function(d, i) { return radius(+(d.value[0]))}); -->
-	  
-	<!-- svg.selectAll("path.county-fill") -->
-      <!-- .data(dVList) -->
-	  <!-- .transition() -->
-	  <!-- .ease(transitionEase) -->
-	  <!-- .duration(duration) -->
-	  <!-- .style("fill-opacity", function (d, i) {  -->
-	    <!-- if (+(d.value[0]) >= 1) return 0; -->
-		<!-- return 1; -->
-	  <!-- }) -->
-  <!-- } -->
-<!-- } -->
-
-<!-- d3.json("states.json") -->
-    <!-- .then(function(sc) { -->
-		<!-- let state = topojson.feature(sc, sc.objects.places); -->
-
-		<!-- svg.append("path") -->
-		  <!-- .datum(state) -->
-		  <!-- .attr("d", path) -->
-		  <!-- .attr("class", "state"); -->
-    <!-- }); -->
-
-<!-- d3.json("counties.json") -->
-	<!-- .then(function(counties) { -->
-		<!-- let features = topojson.feature(counties, counties.objects.places).features; -->
-		<!-- countyObjects = features; -->
-		<!-- svg.append('g') -->
-		  <!-- .selectAll("path.county-fill") -->
-		  <!-- .data(features.sort(function(a, b) {  -->
-			<!-- if (b.properties.NAME > a.properties.NAME) return -1; -->
-			<!-- if (b.properties.NAME < a.properties.NAME) return 1; -->
-			<!-- return 0;})) -->
-		  <!-- .enter() -->
-		  <!-- .append("path") -->
-		  <!-- .attr("d", path) -->
-		  <!-- .attr("class", "county-fill"); -->
-
-		<!-- svg.append("path") -->
-		<!-- .datum(topojson.mesh(counties, counties.objects.places, function(a, b) { return a !== b; })) -->
-		<!-- .attr("d", path) -->
-		<!-- .attr("class", "county-boundary"); -->
-
-		<!-- svg.append("path") -->
-		<!-- .datum(topojson.mesh(counties, counties.objects.places, function(a, b) { return a === b; })) -->
-		<!-- .attr("d", path) -->
-		<!-- .attr("class", "county-boundary IRL"); -->
-		<!-- for (let i = 0; i < features.length; i++){ -->
-		<!-- let centroid = path.centroid(features[i]); -->
-		<!-- if (features[i].properties.NAME == "Charleston"){ -->
-		  <!-- centroid = [centroid[0] - 15, centroid[1] + 12]; -->
-		<!-- } -->
-		<!-- centroids[features[i].properties.NAME] = centroid; -->
-		<!-- } -->
-		<!-- inputInitialData(); -->
-	<!-- }); -->
+svg.on("dblclick", () => {
+	currentCoords = initialCoords.clone();});
 </script>
 </body>
 </html>
